@@ -151,6 +151,8 @@ python run_once.py --config config.yaml --env-file .env
 Optional flags:
 
 - `--dry-run` (no email sent)
+- `--local-test-email` (force immediate email using current run results)
+- `--test-recipient you@example.com` (override recipient for local test email)
 
 ### Daily scheduler process
 
@@ -159,6 +161,21 @@ python main.py
 ```
 
 This runs continuously and executes daily at configured time in Europe/Berlin.
+
+### Local test mode (immediate email)
+
+Use this to validate email formatting and dedup behavior without waiting for the scheduler:
+
+```bash
+python run_once.py --config config.yaml --env-file .env --local-test-email --test-recipient you@example.com
+```
+
+Behavior:
+
+- executes the normal source + scoring + dedupe pipeline
+- sends an email immediately to the configured/overridden recipient
+- subject is prefixed with `[LOCAL TEST]`
+- marks sent jobs like a normal run, so deduplication can be validated on repeated test runs
 
 ## Cron-Friendly Alternative
 

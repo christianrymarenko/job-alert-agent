@@ -20,7 +20,12 @@ from src.core.storage import Storage
 logger = logging.getLogger(__name__)
 
 
-def execute_job_search_run(config: Settings, dry_run: bool = False) -> dict[str, int]:
+def execute_job_search_run(
+    config: Settings,
+    dry_run: bool = False,
+    test_mode: bool = False,
+    test_recipient: str | None = None,
+) -> dict[str, int]:
     storage = Storage(config.db_path)
     storage.initialize()
 
@@ -80,8 +85,20 @@ def execute_job_search_run(config: Settings, dry_run: bool = False) -> dict[str,
     unique_new = unique_new[: config.app.max_jobs_per_email]
 
     emails_sent = 0
+    email_test_mode_used = 0
     run_date = datetime.now(ZoneInfo(config.app.timezone))
-    if should_send_email(config, len(unique_new)):
+    if test_mode:
+        if dry_run:
+            logger.warning("Both --dry-run and --test-email used. Test email suppressed by dry-run.")
+        else:
+            recipient = (test_recipient or "").strip() or str(config.smtp.email_to)
+            subject = build_subject(run_date, len(unique_new), prefix="TEST")
+            body = render_plaintext_email(unique_new, run_date)
+            send_email(config, subject, body, email_to_override=recipient)
+            emails_sent = 1
+            email_test_mode_used = 1
+            logger.info("Test email sent to %s with %s candidate jobs", recipient, len(unique_new))
+    elif should_send_email(config, len(unique_new)):
         if not dry_run:
             subject = build_subject(run_date, len(unique_new))
             body = render_plaintext_email(unique_new, run_date)
@@ -94,6 +111,7 @@ def execute_job_search_run(config: Settings, dry_run: bool = False) -> dict[str,
         "matched": len(accepted_scored),
         "new": len(unique_new),
         "emails_sent": emails_sent,
+        "test_email_mode": email_test_mode_used,
         "source_failures": source_failures,
     }
     logger.info("Run summary: %s", summary)
@@ -135,9 +153,24 @@ def cli_main() -> int:
     parser.add_argument("--config", default=None, help="Path to YAML config file")
     parser.add_argument("--env-file", default=None, help="Path to .env file")
     parser.add_argument("--dry-run", action="store_true", help="Run without sending email")
+    parser.add_argument(
+        "--test-email",
+        action="store_true",
+        help="Send immediate test email to verify formatting/dedupe output",
+    )
+    parser.add_argument(
+        "--test-recipient",
+        default=None,
+        help="Override recipient for --test-email (defaults to configured email_to)",
+    )
     args = parser.parse_args()
 
     config = load_config(config_path=args.config, env_file=args.env_file)
     setup_logging(config.log_level)
-    execute_job_search_run(config, dry_run=args.dry_run)
+    execute_job_search_run(
+        config,
+        dry_run=args.dry_run,
+        test_mode=args.test_email,
+        test_recipient=args.test_recipient,
+    )
     return 0

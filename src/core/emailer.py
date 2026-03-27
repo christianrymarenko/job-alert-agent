@@ -30,8 +30,11 @@ Heute wurden keine neuen passenden AI/KI Jobs gefunden.
 )
 
 
-def build_subject(run_date: datetime, jobs_count: int) -> str:
-    return f"Neue passende AI/KI Jobs - {jobs_count} neue Treffer - {run_date.date().isoformat()}"
+def build_subject(run_date: datetime, jobs_count: int, prefix: str | None = None) -> str:
+    base = f"Neue passende AI/KI Jobs - {jobs_count} neue Treffer - {run_date.date().isoformat()}"
+    if prefix:
+        return f"[{prefix}] {base}"
+    return base
 
 
 def render_plaintext_email(jobs: list[JobPosting], run_date: datetime) -> str:
@@ -42,11 +45,16 @@ def should_send_email(config: Settings, job_count: int) -> bool:
     return job_count > 0 or config.app.send_no_results_email
 
 
-def send_email(config: Settings, subject: str, body: str) -> None:
+def send_email(
+    config: Settings,
+    subject: str,
+    body: str,
+    email_to_override: str | None = None,
+) -> None:
     msg = EmailMessage()
     msg["Subject"] = subject
     msg["From"] = config.smtp.email_from
-    msg["To"] = config.smtp.email_to
+    msg["To"] = email_to_override or config.smtp.email_to
     msg.set_content(body)
 
     if config.smtp.use_tls:
