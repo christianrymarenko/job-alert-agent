@@ -1,1 +1,233 @@
-# job-alert-agent
+# German AI/KI Job Search Agent (Production-Ready MVP)
+
+Automated Python job agent for the German market:
+
+- searches AI/KI-relevant roles once per day
+- scores each role against a senior business-facing AI profile
+- deduplicates against previously sent jobs (persistent SQLite)
+- sends one daily email at **10:00 Europe/Berlin** with only new matches
+
+This MVP is built to be modular and robust, with clear extension points for additional sources.
+
+## Features
+
+- **Daily run** with APScheduler (or manual run via CLI)
+- **Source modularity**: enable/disable sources in YAML config
+- **Relevance scoring**:
+  - title and semantic role match
+  - seniority fit
+  - Germany/hybrid/remote fit
+  - business-facing AI consulting/project/transformation relevance
+  - penalties for engineering-heavy roles
+- **Deduplication**:
+  - canonical URL
+  - source + external job ID
+  - company + title fingerprint
+- **SQLite persistence** for jobs, run logs, and error events
+- **SMTP email delivery** using environment variables for secrets
+- **Structured logging** and graceful partial-failure handling
+- **Basic test suite** for canonicalization, scoring, dedupe, email formatting
+
+## Project Structure
+
+```text
+.
+├── config.example.yaml
+├── .env.example
+├── requirements.txt
+├── run_once.py
+├── main.py
+├── src
+│   ├── core
+│   │   ├── canonicalize.py
+│   │   ├── config.py
+│   │   ├── dedupe.py
+│   │   ├── emailer.py
+│   │   ├── logging_setup.py
+│   │   ├── models.py
+│   │   ├── pipeline.py
+│   │   ├── scoring.py
+│   │   ├── sources.py
+│   │   └── storage.py
+│   └── sources
+│       ├── adzuna.py
+│       ├── base.py
+│       ├── company_pages.py
+│       └── greenhouse.py
+└── tests
+    ├── test_canonicalize.py
+    ├── test_dedupe.py
+    ├── test_emailer.py
+    └── test_scoring.py
+```
+
+## Implemented Sources (MVP)
+
+1. **Adzuna API source**
+   - reliable API-style access pattern
+   - configurable pages/results
+   - uses keyword query loop with Germany focus
+2. **Greenhouse boards source**
+   - direct board API endpoint (`boards-api.greenhouse.io`)
+   - configurable board tokens list
+3. **Company pages source (seed URLs)**
+   - conservative HTML anchor extraction
+   - filters only likely job/career links
+   - supports direct discovery from known company career entry pages
+
+### Why not scrape everything directly?
+
+Some large job boards are heavily dynamic and/or restricted. This MVP favors:
+
+- official/public API endpoints where available
+- direct company career pages
+- legally safer, modular discovery methods
+
+Additional adapters can be added under `src/sources/` and enabled via config.
+
+## Setup
+
+### 1) Create and activate a virtual environment
+
+```bash
+python -m venv .venv
+source .venv/bin/activate
+```
+
+### 2) Install dependencies
+
+```bash
+pip install -r requirements.txt
+```
+
+### 3) Configure environment
+
+```bash
+cp .env.example .env
+```
+
+Set SMTP credentials and recipient in `.env`.
+
+### 4) Configure runtime options
+
+```bash
+cp config.example.yaml config.yaml
+```
+
+Adjust:
+
+- `app.send_time` (default `10:00`)
+- `app.timezone` (default `Europe/Berlin`)
+- `app.min_relevance_score`
+- `sources.enabled`
+- source-specific settings (`adzuna`, `greenhouse`, `company_pages`)
+- keyword/search preferences
+
+## Running
+
+### Manual one-off run (testing)
+
+```bash
+python run_once.py --config config.yaml --env-file .env
+```
+
+Optional flags:
+
+- `--dry-run` (no email sent)
+
+### Daily scheduler process
+
+```bash
+python main.py
+```
+
+This runs continuously and executes daily at configured time in Europe/Berlin.
+
+## Cron-Friendly Alternative
+
+If you prefer system cron instead of APScheduler:
+
+```cron
+0 10 * * * cd /path/to/project && /path/to/python run_once.py --config config.yaml --env-file .env
+```
+
+Ensure system timezone and environment variable loading are configured correctly.
+
+## Email Format
+
+Daily email includes:
+
+- subject with date + number of new jobs
+- short intro
+- numbered list of jobs
+  - title, company, location, source
+  - optional match reason
+  - direct link
+
+Example subject:
+
+- `Neue passende AI/KI Jobs - 5 neue Treffer - 2026-03-27`
+
+## Deduplication Details
+
+A job is considered already sent if any of these match prior sent records:
+
+1. `canonical_url` match
+2. same `source` + same external `job_id`
+3. normalized `(company, title)` fingerprint match
+
+This protects against tracking parameters, URL changes, and minor source URL churn.
+
+## Scoring Logic (High-Level)
+
+Weighted heuristic model:
+
+- positive:
+  - AI/KI/GenAI title terms
+  - consultant/manager/lead/project/transformation/adoption terms
+  - business-facing responsibilities
+  - senior-level cues
+  - Germany + remote/hybrid fit
+- negative:
+  - engineering-heavy terms (backend, full stack, MLOps, deep learning)
+  - research-heavy cues (scientist, PhD, research)
+  - junior/internship/working student cues
+  - non-Germany location cues
+
+Only jobs at or above `min_relevance_score` are considered for email.
+
+## Testing
+
+Run:
+
+```bash
+pytest
+```
+
+Included tests cover:
+
+- URL canonicalization
+- dedupe key behavior
+- scoring behavior (positive/negative)
+- email body formatting
+
+## Compliance, Reliability, and Tradeoffs
+
+- Respect robots.txt and source Terms of Service before enabling aggressive crawling.
+- Prefer official APIs and career pages over brittle scraping.
+- Keep request rate conservative and configurable.
+- Use source isolation: if one source fails, pipeline continues and logs error.
+- For high-volume/production deployment:
+  - run behind process supervisor (systemd, Docker, etc.)
+  - centralize logs
+  - monitor email delivery failures
+  - regularly review source adapter validity
+
+## Extending Sources
+
+Add a new adapter in `src/sources/` implementing `SourceAdapter.fetch_jobs()`, then wire it in:
+
+- `src/core/sources.py` registry
+- `config.yaml` enabled list/settings
+
+This design lets you switch sources on/off independently.
