@@ -17,157 +17,245 @@ HTML_TEMPLATE = Template(
     <title>AI/KI Job Agent – Latest Matches</title>
     <style>
       :root {
-        --bg: #f6f8fb;
+        --bg: #f4f6fb;
+        --ink: #0f1b2b;
+        --muted: #5d6b7c;
+        --line: #d9e1ec;
         --card: #ffffff;
-        --text: #1b2430;
-        --muted: #5f6b7a;
-        --accent: #2d6cdf;
-        --accent-soft: #eaf1ff;
-        --tag: #eef3f7;
-        --good: #0b7a3e;
+        --accent: #1f4fbf;
+        --accent-soft: #e9f0ff;
+        --pill: #eef2f8;
+        --shadow: 0 10px 30px rgba(18, 35, 68, 0.08);
+        --radius: 16px;
       }
       * { box-sizing: border-box; }
       body {
         margin: 0;
-        padding: 0;
-        font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
-        background: var(--bg);
-        color: var(--text);
+        font-family: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, Helvetica, Arial, sans-serif;
+        color: var(--ink);
+        background:
+          radial-gradient(1100px 500px at 10% -10%, #e7edff 0%, transparent 55%),
+          radial-gradient(900px 420px at 100% 0%, #edf4ff 0%, transparent 55%),
+          var(--bg);
       }
-      .wrap {
-        max-width: 980px;
+      .container {
+        max-width: 1020px;
         margin: 0 auto;
-        padding: 20px 14px 40px;
+        padding: 28px 16px 52px;
       }
-      .header {
+      .masthead {
         background: var(--card);
-        border-radius: 12px;
-        padding: 16px;
-        margin-bottom: 16px;
-        box-shadow: 0 2px 12px rgba(30, 50, 90, 0.08);
+        border: 1px solid var(--line);
+        border-radius: var(--radius);
+        box-shadow: var(--shadow);
+        overflow: hidden;
+        margin-bottom: 18px;
+      }
+      .masthead-top {
+        padding: 20px 22px 16px;
+        border-bottom: 1px solid #eef2f8;
+      }
+      .eyebrow {
+        display: inline-block;
+        font-size: 0.73rem;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--accent);
+        background: var(--accent-soft);
+        border-radius: 999px;
+        padding: 5px 10px;
+        font-weight: 700;
+        margin-bottom: 12px;
       }
       h1 {
-        margin: 0 0 8px;
-        font-size: 1.35rem;
+        margin: 0;
+        font-size: 1.45rem;
+        line-height: 1.28;
       }
-      .meta, .filters { color: var(--muted); font-size: 0.93rem; }
-      .filters ul {
-        margin: 8px 0 0;
-        padding-left: 20px;
+      .subline {
+        margin-top: 8px;
+        color: var(--muted);
+        font-size: 0.95rem;
       }
-      .section-title {
-        margin: 18px 2px 10px;
-        font-size: 1.05rem;
-      }
-      .grid {
+      .stats {
         display: grid;
-        grid-template-columns: 1fr;
-        gap: 12px;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 0;
+      }
+      .stat {
+        padding: 14px 18px 16px;
+        border-right: 1px solid #eef2f8;
+      }
+      .stat:last-child { border-right: 0; }
+      .stat-label {
+        font-size: 0.76rem;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        color: var(--muted);
+        margin-bottom: 4px;
+      }
+      .stat-value {
+        font-size: 1.24rem;
+        font-weight: 700;
+      }
+      .summary {
+        background: var(--card);
+        border: 1px solid var(--line);
+        border-radius: var(--radius);
+        padding: 15px 18px 14px;
+        margin-bottom: 18px;
+      }
+      .summary-title {
+        font-size: 0.86rem;
+        color: var(--muted);
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        margin-bottom: 8px;
+        font-weight: 700;
+      }
+      .summary ul {
+        margin: 0;
+        padding-left: 18px;
+      }
+      .summary li {
+        margin: 3px 0;
+        color: #2b3a4f;
+      }
+      .section {
+        margin-top: 20px;
+      }
+      .section h2 {
+        margin: 0 0 10px;
+        font-size: 1.02rem;
+        letter-spacing: 0.02em;
       }
       .card {
         background: var(--card);
-        border-radius: 12px;
-        padding: 14px;
-        box-shadow: 0 2px 10px rgba(30, 50, 90, 0.06);
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        box-shadow: 0 4px 14px rgba(20, 32, 58, 0.05);
+        padding: 14px 15px 13px;
+        margin-bottom: 11px;
       }
-      .top-line {
+      .card-top {
         display: flex;
-        justify-content: space-between;
-        gap: 10px;
         align-items: flex-start;
+        justify-content: space-between;
+        gap: 12px;
       }
-      .title {
+      .job-title {
         margin: 0;
-        font-size: 1.02rem;
+        font-size: 1rem;
         line-height: 1.35;
       }
-      .score {
-        padding: 4px 10px;
-        border-radius: 999px;
+      .score-pill {
         background: var(--accent-soft);
         color: var(--accent);
-        font-weight: 600;
+        border-radius: 999px;
+        font-size: 0.78rem;
+        font-weight: 700;
+        padding: 5px 11px;
         white-space: nowrap;
       }
-      .sub {
-        margin: 5px 0 8px;
+      .meta {
+        margin-top: 5px;
         color: var(--muted);
-        font-size: 0.93rem;
+        font-size: 0.9rem;
       }
       .why {
-        margin: 8px 0 10px;
-        color: #233243;
-        font-size: 0.92rem;
+        margin-top: 9px;
+        font-size: 0.9rem;
+        color: #243447;
       }
+      .why strong { color: #10243f; }
       .tags {
         display: flex;
-        flex-wrap: wrap;
         gap: 6px;
-        margin-bottom: 10px;
+        flex-wrap: wrap;
+        margin-top: 10px;
       }
       .tag {
-        background: var(--tag);
+        background: var(--pill);
         border-radius: 999px;
-        padding: 3px 9px;
-        font-size: 0.78rem;
-        color: #33485f;
-      }
-      .link a {
-        color: var(--accent);
-        text-decoration: none;
+        color: #32465c;
+        font-size: 0.76rem;
+        padding: 4px 9px;
         font-weight: 600;
       }
-      .link a:hover { text-decoration: underline; }
+      .job-link {
+        margin-top: 11px;
+      }
+      .job-link a {
+        color: var(--accent);
+        text-decoration: none;
+        font-weight: 700;
+      }
+      .job-link a:hover { text-decoration: underline; }
       .empty {
         background: var(--card);
-        border-radius: 12px;
-        padding: 18px;
-        box-shadow: 0 2px 10px rgba(30, 50, 90, 0.06);
+        border: 1px solid var(--line);
+        border-radius: var(--radius);
+        padding: 20px;
         color: var(--muted);
       }
-      @media (max-width: 640px) {
-        .top-line { flex-direction: column; }
-        .score { align-self: flex-start; }
+      @media (max-width: 720px) {
+        .stats { grid-template-columns: 1fr; }
+        .stat { border-right: 0; border-bottom: 1px solid #eef2f8; }
+        .stat:last-child { border-bottom: 0; }
+        .card-top { flex-direction: column; }
+        .score-pill { align-self: flex-start; }
       }
     </style>
   </head>
   <body>
-    <main class="wrap">
-      <section class="header">
-        <h1>AI/KI Job Agent – Latest Matches</h1>
-        <div class="meta">
-          Generated: {{ generated_at }}<br />
-          Matches found: <strong>{{ count }}</strong><br />
-          Minimum score threshold: <strong>{{ min_score }}</strong>
+    <main class="container">
+      <section class="masthead">
+        <div class="masthead-top">
+          <span class="eyebrow">Curated Recruiter Digest</span>
+          <h1>AI/KI Job Agent – Latest Matches</h1>
+          <div class="subline">Generated {{ generated_at }}</div>
         </div>
-        <div class="filters">
-          Active filters summary:
-          <ul>
-            {% for item in active_filters %}
-              <li>{{ item }}</li>
-            {% endfor %}
-          </ul>
+        <div class="stats">
+          <div class="stat">
+            <div class="stat-label">Matches Found</div>
+            <div class="stat-value">{{ count }}</div>
+          </div>
+          <div class="stat">
+            <div class="stat-label">Minimum Score</div>
+            <div class="stat-value">{{ min_score }}</div>
+          </div>
+          <div class="stat">
+            <div class="stat-label">Digest Type</div>
+            <div class="stat-value">AI/KI Leadership Fit</div>
+          </div>
         </div>
+      </section>
+
+      <section class="summary">
+        <div class="summary-title">Active Filters Summary</div>
+        <ul>
+          {% for item in active_filters %}
+            <li>{{ item }}</li>
+          {% endfor %}
+        </ul>
       </section>
 
       {% if count == 0 %}
         <section class="empty">
           <strong>No new matching jobs found today.</strong><br />
-          The run completed successfully and this report was generated as an empty-state overview.
+          The pipeline ran successfully and prepared this digest view for review.
         </section>
       {% else %}
         {% if top_matches %}
-          <h2 class="section-title">Top Matches</h2>
-          <section class="grid">
+          <section class="section">
+            <h2>Top Matches</h2>
             {% for job in top_matches %}
               <article class="card">
-                <div class="top-line">
-                  <h3 class="title">{{ job.title }}</h3>
-                  <div class="score">Score {{ job.score }}</div>
+                <div class="card-top">
+                  <h3 class="job-title">{{ job.title }}</h3>
+                  <div class="score-pill">Score {{ job.score }}</div>
                 </div>
-                <div class="sub">
-                  {{ job.company }} · {{ job.location }} · {{ job.source }}
-                </div>
+                <div class="meta">{{ job.company }} · {{ job.location }} · {{ job.source }}</div>
                 <div class="why"><strong>Why it matches:</strong> {{ job.match_reason }}</div>
                 {% if job.tags %}
                   <div class="tags">
@@ -176,8 +264,8 @@ HTML_TEMPLATE = Template(
                     {% endfor %}
                   </div>
                 {% endif %}
-                <div class="link">
-                  <a href="{{ job.url }}" target="_blank" rel="noopener noreferrer">Open job posting</a>
+                <div class="job-link">
+                  <a href="{{ job.url }}" target="_blank" rel="noopener noreferrer">Open job posting ↗</a>
                 </div>
               </article>
             {% endfor %}
@@ -185,17 +273,15 @@ HTML_TEMPLATE = Template(
         {% endif %}
 
         {% if good_matches %}
-          <h2 class="section-title">Good Matches</h2>
-          <section class="grid">
+          <section class="section">
+            <h2>Good Matches</h2>
             {% for job in good_matches %}
               <article class="card">
-                <div class="top-line">
-                  <h3 class="title">{{ job.title }}</h3>
-                  <div class="score">Score {{ job.score }}</div>
+                <div class="card-top">
+                  <h3 class="job-title">{{ job.title }}</h3>
+                  <div class="score-pill">Score {{ job.score }}</div>
                 </div>
-                <div class="sub">
-                  {{ job.company }} · {{ job.location }} · {{ job.source }}
-                </div>
+                <div class="meta">{{ job.company }} · {{ job.location }} · {{ job.source }}</div>
                 <div class="why"><strong>Why it matches:</strong> {{ job.match_reason }}</div>
                 {% if job.tags %}
                   <div class="tags">
@@ -204,8 +290,8 @@ HTML_TEMPLATE = Template(
                     {% endfor %}
                   </div>
                 {% endif %}
-                <div class="link">
-                  <a href="{{ job.url }}" target="_blank" rel="noopener noreferrer">Open job posting</a>
+                <div class="job-link">
+                  <a href="{{ job.url }}" target="_blank" rel="noopener noreferrer">Open job posting ↗</a>
                 </div>
               </article>
             {% endfor %}
