@@ -12,6 +12,10 @@ class AppSettings(BaseModel):
     min_relevance_score: int = 55
     send_no_results_email: bool = False
     max_jobs_per_email: int = 30
+    report_dir: str = "reports"
+    generate_html_report: bool = True
+    generate_json_report: bool = True
+    archive_reports: bool = True
 
 
 class SearchSettings(BaseModel):

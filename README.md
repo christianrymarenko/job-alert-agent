@@ -150,7 +150,8 @@ python run_once.py --config config.yaml --env-file .env
 
 Optional flags:
 
-- `--dry-run` (skip SMTP completely; still writes output artifacts and prints console summary)
+- `--dry-run` (skip SMTP completely; still writes console + report artifacts)
+- `--html-report` (generate browser-ready HTML + JSON reports under `reports/`)
 - `--test-email` (force immediate email attempt using current run results)
 - `--test-recipient you@example.com` (override recipient for test email)
 
@@ -167,7 +168,7 @@ This runs continuously and executes daily at configured time in Europe/Berlin.
 Use this when SMTP is disabled/broken or when you only want to validate results locally:
 
 ```bash
-python run_once.py --config config.yaml --env-file .env --dry-run
+python run_once.py --config config.yaml --env-file .env --dry-run --html-report
 ```
 
 Behavior:
@@ -177,8 +178,36 @@ Behavior:
 - writes local artifacts:
   - `daily_jobs.txt`
   - `data/latest_jobs.json`
+- if `--html-report` is enabled, also writes:
+  - `reports/latest_jobs.html`
+  - `reports/latest_jobs.json`
+  - optional archives under `reports/archive/`
 - prints a readable summary and job list to console
 - run succeeds even if SMTP is not configured
+
+### HTML report mode (browser review)
+
+Generate a clean report you can open locally in a browser:
+
+```bash
+python run_once.py --config config.yaml --env-file .env --dry-run --html-report
+```
+
+Report outputs:
+
+- `reports/latest_jobs.html`
+- `reports/latest_jobs.json`
+- archive copies:
+  - `reports/archive/jobs_YYYY-MM-DD_HH-MM.html`
+  - `reports/archive/jobs_YYYY-MM-DD_HH-MM.json`
+
+Open report:
+
+```bash
+xdg-open reports/latest_jobs.html
+```
+
+or just double-click `reports/latest_jobs.html` in your file browser.
 
 ### Test email mode (immediate send attempt)
 

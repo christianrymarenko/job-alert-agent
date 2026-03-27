@@ -1,10 +1,8 @@
 from __future__ import annotations
 
 import argparse
-import json
 import logging
-from datetime import UTC, datetime
-from pathlib import Path
+from datetime import datetime
 from uuid import uuid4
 
 from apscheduler.schedulers.blocking import BlockingScheduler
@@ -15,6 +13,12 @@ from src.core.config import load_config
 from src.core.emailer import build_subject, render_plaintext_email, send_email, should_send_email
 from src.core.logging_setup import setup_logging
 from src.core.models import JobPosting, Settings
+from src.core.reporting import (
+    print_results_to_console,
+    write_html_report,
+    write_json_report,
+    write_legacy_daily_text_report,
+)
 from src.core.scoring import score_job
 from src.core.sources import build_sources
 from src.core.storage import Storage
@@ -27,6 +31,7 @@ def execute_job_search_run(
     dry_run: bool = False,
     test_mode: bool = False,
     test_recipient: str | None = None,
+    html_report: bool = False,
 ) -> dict[str, int]:
     storage = Storage(config.db_path)
     storage.initialize()
@@ -119,21 +124,66 @@ def execute_job_search_run(
         else:
             logger.info("Dry-run enabled: skipping SMTP email send.")
 
-    _write_result_artifacts(
-        unique_new,
+    email_attempted = bool(test_mode or (should_send_email(config, len(unique_new)) and not dry_run))
+    email_sent_flag = bool(emails_sent)
+    email_failed_flag = bool(email_failed)
+
+    # Always write fallback artifacts independent of SMTP status.
+    write_legacy_daily_text_report(
+        jobs=unique_new,
         run_date=run_date,
-        email_attempted=bool(test_mode or (should_send_email(config, len(unique_new)) and not dry_run)),
-        email_sent=bool(emails_sent),
-        email_failed=bool(email_failed),
+        email_attempted=email_attempted,
+        email_sent=email_sent_flag,
+        email_failed=email_failed_flag,
         dry_run=dry_run,
+        path="daily_jobs.txt",
     )
-    _print_results_to_console(
-        unique_new,
+    write_json_report(
+        jobs=unique_new,
         run_date=run_date,
-        email_attempted=bool(test_mode or (should_send_email(config, len(unique_new)) and not dry_run)),
-        email_sent=bool(emails_sent),
-        email_failed=bool(email_failed),
+        config=config,
+        email_attempted=email_attempted,
+        email_sent=email_sent_flag,
+        email_failed=email_failed_flag,
         dry_run=dry_run,
+        latest_path="data/latest_jobs.json",
+        archive=False,
+    )
+    if html_report:
+        write_json_report(
+            jobs=unique_new,
+            run_date=run_date,
+            config=config,
+            email_attempted=email_attempted,
+            email_sent=email_sent_flag,
+            email_failed=email_failed_flag,
+            dry_run=dry_run,
+            latest_path="reports/latest_jobs.json",
+            archive=True,
+        )
+        write_html_report(
+            jobs=unique_new,
+            run_date=run_date,
+            config=config,
+            email_attempted=email_attempted,
+            email_sent=email_sent_flag,
+            email_failed=email_failed_flag,
+            dry_run=dry_run,
+            latest_path="reports/latest_jobs.html",
+            archive=True,
+        )
+    print_results_to_console(
+        jobs=unique_new,
+        run_date=run_date,
+        email_attempted=email_attempted,
+        email_sent=email_sent_flag,
+        email_failed=email_failed_flag,
+        dry_run=dry_run,
+        report_paths=(
+            ["daily_jobs.txt", "data/latest_jobs.json", "reports/latest_jobs.html", "reports/latest_jobs.json"]
+            if html_report
+            else ["daily_jobs.txt", "data/latest_jobs.json"]
+        ),
     )
 
     summary = {
@@ -143,112 +193,11 @@ def execute_job_search_run(
         "emails_sent": emails_sent,
         "test_email_mode": email_test_mode_used,
         "email_failed": email_failed,
+        "html_report": int(html_report),
         "source_failures": source_failures,
     }
     logger.info("Run summary: %s", summary)
     return summary
-
-
-def _write_result_artifacts(
-    jobs: list[JobPosting],
-    run_date: datetime,
-    email_attempted: bool,
-    email_sent: bool,
-    email_failed: bool,
-    dry_run: bool,
-) -> None:
-    txt_path = Path("daily_jobs.txt")
-    json_path = Path("data/latest_jobs.json")
-    json_path.parent.mkdir(parents=True, exist_ok=True)
-
-    lines: list[str] = []
-    lines.append(f"AI/KI Job Agent Results - {run_date.date().isoformat()}")
-    lines.append(f"Total new jobs: {len(jobs)}")
-    if dry_run:
-        lines.append("Email status: skipped (--dry-run)")
-    elif email_sent:
-        lines.append("Email status: sent")
-    elif email_failed:
-        lines.append("Email status: failed (run continued)")
-    elif email_attempted:
-        lines.append("Email status: attempted (not sent)")
-    else:
-        lines.append("Email status: not attempted (config/no-results policy)")
-    lines.append("")
-    if not jobs:
-        lines.append("No matching new jobs found.")
-    else:
-        for idx, job in enumerate(jobs, start=1):
-            lines.append(f"{idx}. {job.title} - {job.company} - {job.location}")
-            lines.append(f"   Source: {job.source}")
-            lines.append(
-                "   Why it matches: "
-                + (job.match_reason or "Relevante AI/KI Rolle mit Business-/Projektfokus")
-            )
-            lines.append(f"   Link: {job.url}")
-            lines.append("")
-    txt_path.write_text("\n".join(lines).rstrip() + "\n", encoding="utf-8")
-
-    payload = {
-        "generated_at": datetime.now(UTC).isoformat(),
-        "run_date": run_date.date().isoformat(),
-        "count": len(jobs),
-        "email": {
-            "attempted": email_attempted,
-            "sent": email_sent,
-            "failed": email_failed,
-            "dry_run": dry_run,
-        },
-        "jobs": [
-            {
-                "title": job.title,
-                "company": job.company,
-                "location": job.location,
-                "source": job.source,
-                "url": job.url,
-                "score": job.score,
-                "match_reason": job.match_reason,
-            }
-            for job in jobs
-        ],
-    }
-    json_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
-
-
-def _print_results_to_console(
-    jobs: list[JobPosting],
-    run_date: datetime,
-    email_attempted: bool,
-    email_sent: bool,
-    email_failed: bool,
-    dry_run: bool,
-) -> None:
-    print("")
-    print(f"=== AI/KI Job Agent Results ({run_date.date().isoformat()}) ===")
-    print(f"New jobs: {len(jobs)}")
-    if dry_run:
-        print("Email: skipped (--dry-run)")
-    elif email_sent:
-        print("Email: sent")
-    elif email_failed:
-        print("Email: failed (run continued, artifacts written)")
-    elif email_attempted:
-        print("Email: attempted (not sent)")
-    else:
-        print("Email: not attempted (config/no-results policy)")
-    if not jobs:
-        print("No matching new jobs found.")
-        print("")
-        return
-    for idx, job in enumerate(jobs, start=1):
-        print(f"{idx}. {job.title} - {job.company} - {job.location}")
-        print(f"   Source: {job.source}")
-        print(
-            "   Why: "
-            + (job.match_reason or "Relevante AI/KI Rolle mit Business-/Projektfokus")
-        )
-        print(f"   Link: {job.url}")
-    print("")
 
 
 def _parse_send_time(send_time: str) -> tuple[int, int]:
@@ -287,6 +236,11 @@ def cli_main() -> int:
     parser.add_argument("--env-file", default=None, help="Path to .env file")
     parser.add_argument("--dry-run", action="store_true", help="Run without sending email")
     parser.add_argument(
+        "--html-report",
+        action="store_true",
+        help="Generate reports/latest_jobs.html and reports/latest_jobs.json",
+    )
+    parser.add_argument(
         "--test-email",
         action="store_true",
         help="Send immediate test email to verify formatting/dedupe output",
@@ -305,5 +259,6 @@ def cli_main() -> int:
         dry_run=args.dry_run,
         test_mode=args.test_email,
         test_recipient=args.test_recipient,
+        html_report=args.html_report,
     )
     return 0
