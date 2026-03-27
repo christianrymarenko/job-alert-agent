@@ -28,8 +28,8 @@ def test_high_score_for_relevant_business_ai_role() -> None:
     )
 
     score, reason = score_job(job, cfg)
-    assert score >= 70
-    assert "title" in reason.lower()
+    assert score >= 75
+    assert "ai signal" in reason.lower()
 
 
 def test_low_score_for_engineering_role() -> None:
@@ -45,7 +45,55 @@ def test_low_score_for_engineering_role() -> None:
 
     score, reason = score_job(job, cfg)
     assert score < 50
-    assert "penalties" in reason.lower()
+    assert "rejected" in reason.lower() or "penalt" in reason.lower()
+
+
+def test_generic_consulting_without_ai_signal_is_rejected() -> None:
+    cfg = _cfg()
+    job = JobPosting(
+        source="test",
+        title="Senior Consultant Programmatic Advertising",
+        company="MediaHouse",
+        location="Munich",
+        url="https://example.com/jobs/media-consulting",
+        description_snippet="Drive media strategy and client campaigns with stakeholder management.",
+    )
+    score, reason = score_job(job, cfg)
+    assert score == 0
+    assert "hard exclude" in reason.lower()
+
+
+def test_hard_exclusion_phrase_blocks_non_ai_role() -> None:
+    cfg = _cfg()
+    job = JobPosting(
+        source="test",
+        title="Senior Account Manager",
+        company="SalesOrg",
+        location="Munich",
+        url="https://example.com/jobs/account-manager",
+        description_snippet="Account manager role for enterprise media clients.",
+    )
+    score, reason = score_job(job, cfg)
+    assert score == 0
+    assert "hard exclude" in reason.lower()
+
+
+def test_ai_signal_in_description_allows_non_explicit_title() -> None:
+    cfg = _cfg()
+    job = JobPosting(
+        source="test",
+        title="Senior Program Lead Digital Platforms",
+        company="PlatformCo",
+        location="Germany / Remote",
+        url="https://example.com/jobs/program-lead",
+        description_snippet=(
+            "Lead Artificial Intelligence transformation, AI implementation, "
+            "and AI strategy across business units."
+        ),
+    )
+    score, reason = score_job(job, cfg)
+    assert score >= 55
+    assert "ai signal" in reason.lower()
 
 
 def test_german_business_facing_consulting_role_scores_high() -> None:
@@ -62,8 +110,8 @@ def test_german_business_facing_consulting_role_scores_high() -> None:
         ),
     )
     score, reason = score_job(job, cfg)
-    assert score >= 80
-    assert "consulting" in reason.lower()
+    assert score >= 70
+    assert "ai role fit" in reason.lower()
     assert "location" in reason.lower()
 
 
@@ -81,4 +129,4 @@ def test_ambiguous_product_title_with_business_ai_context_is_accepted() -> None:
         ),
     )
     score, _ = score_job(job, cfg)
-    assert score >= 65
+    assert score >= 55
