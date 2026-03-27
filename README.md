@@ -71,19 +71,36 @@ This MVP is built to be modular and robust, with clear extension points for addi
    - direct board API endpoint (`boards-api.greenhouse.io`)
    - configurable board tokens list
 3. **Company pages source (seed URLs)**
-   - conservative HTML anchor extraction
-   - filters only likely job/career links
-   - supports direct discovery from known company career entry pages
+   - conservative HTML extraction from configured career pages
+   - **robots.txt aware** and domain allowlist controls
+   - optional crawl depth (default conservative) and per-domain request caps
+   - filters likely job/career links and keeps source metadata
+4. **Search discovery source (search-engine based)**
+   - DuckDuckGo HTML endpoint with configured discovery queries
+   - extracts likely German AI/KI job links from search result pages
+   - supports host/path allowlists to keep discovery focused and compliant
+   - does not execute JavaScript and keeps request rate conservative
 
 ### Why not scrape everything directly?
 
 Some large job boards are heavily dynamic and/or restricted. This MVP favors:
 
 - official/public API endpoints where available
-- direct company career pages
+- direct company career pages with robots awareness
+- search-engine-assisted discovery to locate company-hosted postings
 - legally safer, modular discovery methods
 
 Additional adapters can be added under `src/sources/` and enabled via config.
+
+### Source-level compliance controls
+
+The company-page and discovery adapters include conservative controls:
+
+- robots.txt checks before crawling configured domains
+- request throttling between calls
+- small crawl depth / limited URLs per run
+- optional host/path allowlists to restrict discovery
+- graceful handling of blocked pages and partial failures
 
 ## Setup
 
@@ -120,7 +137,7 @@ Adjust:
 - `app.timezone` (default `Europe/Berlin`)
 - `app.min_relevance_score`
 - `sources.enabled`
-- source-specific settings (`adzuna`, `greenhouse`, `company_pages`)
+- source-specific settings (`adzuna`, `greenhouse`, `company_pages`, `search_discovery`)
 - keyword/search preferences
 
 ## Running
@@ -210,6 +227,7 @@ Included tests cover:
 - dedupe key behavior
 - scoring behavior (positive/negative)
 - email body formatting
+- source adapter extraction/parsing behavior
 
 ## Compliance, Reliability, and Tradeoffs
 

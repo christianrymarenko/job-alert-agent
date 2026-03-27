@@ -28,6 +28,7 @@ class SourceSettings(BaseModel):
     adzuna: dict[str, Any] = Field(default_factory=dict)
     greenhouse: dict[str, Any] = Field(default_factory=dict)
     company_pages: dict[str, Any] = Field(default_factory=dict)
+    search_discovery: dict[str, Any] = Field(default_factory=dict)
 
 
 class SmtpSettings(BaseModel):

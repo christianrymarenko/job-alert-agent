@@ -51,6 +51,7 @@ sources:
     - "adzuna"
     - "greenhouse"
     - "company_pages"
+    - "search_discovery"
 
   adzuna:
     enabled: true
@@ -66,8 +67,31 @@ sources:
 
   company_pages:
     enabled: true
+    max_depth: 1
+    max_pages_per_company: 3
+    throttle_seconds: 1.0
+    respect_robots_txt: true
     pages:
       - name: "adesso"
         url: "https://jobs.adesso-group.com/"
       - name: "serviceplan_softgarden"
         url: "https://serviceplan.softgarden.io/"
+
+  search_discovery:
+    enabled: true
+    provider: "duckduckgo_html" # currently implemented provider
+    max_results_per_query: 20
+    throttle_seconds: 1.0
+    allowed_domains:
+      - "softgarden.io"
+      - "jobs.adesso-group.com"
+      - "smartrecruiters.com"
+      - "greenhouse.io"
+      - "lever.co"
+      - "personio.de"
+      - "personio.com"
+      - "workdayjobs.com"
+      - "join.com"
+      - "stellenanzeigen.de"
+      - "indeed.com"
+      - "linkedin.com"
