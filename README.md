@@ -175,6 +175,7 @@ Optional flags:
 
 - `--dry-run` (skip SMTP completely; still writes console + report artifacts)
 - `--html-report` (generate browser-ready HTML + JSON reports under `reports/`)
+- `--open-report` (opens `reports/latest_jobs.html` in your default browser; implies `--html-report`)
 - `--test-email` (force immediate email attempt using current run results)
 - `--test-recipient you@example.com` (override recipient for test email)
 
@@ -194,9 +195,16 @@ Use this when SMTP is disabled/broken or when you only want to validate results 
 python run_once.py --config config.yaml --env-file .env --dry-run --html-report
 ```
 
+Open report automatically:
+
+```bash
+python run_once.py --config config.yaml --env-file .env --dry-run --open-report
+```
+
 Behavior:
 
 - executes normal source + scoring + dedupe logic
+- if strict pass yields zero matches, reruns filtering once with a moderately lowered threshold
 - **never sends email** in dry-run mode
 - writes local artifacts:
   - `daily_jobs.txt`
@@ -207,6 +215,21 @@ Behavior:
   - optional archives under `reports/archive/`
 - prints a readable summary and job list to console
 - run succeeds even if SMTP is not configured
+
+### Filtering fallback behavior (anti-zero safeguard)
+
+The pipeline keeps strict AI/KI relevance by default, but applies a one-time fallback when all jobs are filtered out:
+
+- pass 1 uses `app.min_relevance_score`
+- if matched jobs are `0` and there were discovered jobs, pass 2 lowers threshold moderately (`-12`, floor `45`)
+- fallback runs once only
+- logs include per-job discard reasons and fallback activation
+- report diagnostics include:
+  - discovered count
+  - strict matched count
+  - discarded low-relevance count
+  - discarded by company/source diversity
+  - fallback enabled + effective threshold
 
 ### Broad market discovery tuning
 

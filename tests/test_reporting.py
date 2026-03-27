@@ -48,6 +48,11 @@ def test_write_html_and_json_reports(tmp_path: Path) -> None:
         dry_run=True,
         latest_path=str(tmp_path / "reports" / "latest_jobs.json"),
         archive=True,
+        diagnostics={
+            "discarded_low_relevance": 2,
+            "fallback_used": True,
+            "fallback_threshold": 62,
+        },
     )
 
     assert html_path.exists()
@@ -62,3 +67,4 @@ def test_write_html_and_json_reports(tmp_path: Path) -> None:
     assert payload["count"] == 1
     assert payload["jobs"][0]["title"] == "AI Transformation Manager"
     assert isinstance(payload["jobs"][0]["tags"], list)
+    assert payload["diagnostics"]["fallback_used"] is True

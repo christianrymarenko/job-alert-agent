@@ -23,6 +23,13 @@ STRONG_AI_SIGNAL_PATTERNS: list[tuple[str, str]] = [
     ("KI Strategie", r"\bki strategie\b"),
     ("AI project", r"\bai project\b"),
     ("KI Projekt", r"\bki projekt\b"),
+    ("AI/ML", r"\bai\s*/\s*ml\b"),
+    ("A.I.", r"\ba\.i\.\b"),
+    ("K.I.", r"\bk\.i\.\b"),
+    ("Gen AI", r"\bgen ai\b"),
+    ("KI-gestützt", r"\bki[- ]gest[uü]tzt\b"),
+    ("AI-powered", r"\bai[- ]powered\b"),
+    ("LLMs", r"\bllms\b"),
 ]
 
 # Must indicate business-side AI ownership, not generic manager language.

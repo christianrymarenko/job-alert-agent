@@ -121,6 +121,35 @@ HTML_TEMPLATE = Template(
         margin: 3px 0;
         color: #2b3a4f;
       }
+      .diagnostics {
+        background: #f8fbff;
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        padding: 12px 14px;
+        margin-top: 12px;
+      }
+      .diagnostics-grid {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 8px;
+      }
+      .diag-card {
+        background: #fff;
+        border: 1px solid #e6edf7;
+        border-radius: 10px;
+        padding: 8px 10px;
+      }
+      .diag-label {
+        font-size: 0.72rem;
+        color: var(--muted);
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+      }
+      .diag-value {
+        font-size: 1rem;
+        font-weight: 700;
+        margin-top: 3px;
+      }
       .section {
         margin-top: 20px;
       }
@@ -217,6 +246,7 @@ HTML_TEMPLATE = Template(
         .stats { grid-template-columns: 1fr; }
         .stat { border-right: 0; border-bottom: 1px solid #eef2f8; }
         .stat:last-child { border-bottom: 0; }
+        .diagnostics-grid { grid-template-columns: 1fr; }
         .card-top { flex-direction: column; }
         .score-pill { align-self: flex-start; }
       }
@@ -253,6 +283,40 @@ HTML_TEMPLATE = Template(
             <li>{{ item }}</li>
           {% endfor %}
         </ul>
+        {% if diagnostics %}
+          <div class="diagnostics">
+            <div class="summary-title">Pipeline Diagnostics</div>
+            <div class="diagnostics-grid">
+              <div class="diag-card">
+                <div class="diag-label">Discovered</div>
+                <div class="diag-value">{{ diagnostics.get("discovered", 0) }}</div>
+              </div>
+              <div class="diag-card">
+                <div class="diag-label">Discarded (Low Relevance)</div>
+                <div class="diag-value">{{ diagnostics.get("discarded_low_relevance", 0) }}</div>
+              </div>
+              <div class="diag-card">
+                <div class="diag-label">Discarded (Diversity)</div>
+                <div class="diag-value">{{ diagnostics.get("discarded_diversity", 0) }}</div>
+              </div>
+              <div class="diag-card">
+                <div class="diag-label">Discarded (Already Sent)</div>
+                <div class="diag-value">{{ diagnostics.get("discarded_already_sent", 0) }}</div>
+              </div>
+              <div class="diag-card">
+                <div class="diag-label">Initial Threshold</div>
+                <div class="diag-value">{{ diagnostics.get("initial_threshold", min_score) }}</div>
+              </div>
+              <div class="diag-card">
+                <div class="diag-label">Final Threshold</div>
+                <div class="diag-value">{{ diagnostics.get("final_threshold", min_score) }}</div>
+              </div>
+            </div>
+            {% if diagnostics.get("fallback_used") %}
+              <p><strong>Fallback mode applied:</strong> initial filtering produced zero matches, so threshold was relaxed once.</p>
+            {% endif %}
+          </div>
+        {% endif %}
       </section>
 
       {% if count == 0 %}
@@ -385,6 +449,7 @@ def write_json_report(
     dry_run: bool,
     latest_path: str,
     archive: bool,
+    diagnostics: dict[str, object] | None = None,
 ) -> Path:
     out_path = Path(latest_path)
     out_path.parent.mkdir(parents=True, exist_ok=True)
@@ -401,6 +466,8 @@ def write_json_report(
         },
         "jobs": [_serialize_job(job) for job in jobs],
     }
+    if diagnostics:
+        payload["diagnostics"] = diagnostics
     out_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
     if archive:
         archive_path = _archive_path(out_path, run_date)
@@ -418,6 +485,7 @@ def write_html_report(
     dry_run: bool,
     latest_path: str,
     archive: bool,
+    diagnostics: dict[str, object] | None = None,
 ) -> Path:
     sorted_jobs = sorted(jobs, key=lambda j: (-int(j.score), j.title.lower(), j.company.lower()))
     enriched = [dict(_serialize_job(job)) for job in sorted_jobs]
@@ -434,6 +502,7 @@ def write_html_report(
         email_sent=email_sent,
         email_failed=email_failed,
         dry_run=dry_run,
+        diagnostics=diagnostics or {},
     )
 
     out_path = Path(latest_path)
@@ -493,6 +562,7 @@ def print_results_to_console(
     email_failed: bool,
     dry_run: bool,
     report_paths: list[str],
+    diagnostics: dict[str, object] | None = None,
 ) -> None:
     print("")
     print(f"=== AI/KI Job Agent Results ({run_date.date().isoformat()}) ===")
@@ -512,6 +582,29 @@ def print_results_to_console(
         print("Reports:")
         for path in report_paths:
             print(f" - {path}")
+    if diagnostics:
+        print("Diagnostics:")
+        print(
+            " - discovered={discovered} matched_primary={matched_primary} matched_final={matched_final}".format(
+                discovered=diagnostics.get("discovered", 0),
+                matched_primary=diagnostics.get("matched_primary", 0),
+                matched_final=diagnostics.get("matched_final", 0),
+            )
+        )
+        print(
+            " - threshold_initial={initial_threshold} threshold_final={final_threshold} fallback_used={fallback_used}".format(
+                initial_threshold=diagnostics.get("initial_threshold", "n/a"),
+                final_threshold=diagnostics.get("final_threshold", "n/a"),
+                fallback_used=diagnostics.get("fallback_used", False),
+            )
+        )
+        print(
+            " - discarded_low_relevance={dlr} discarded_diversity={dd} discarded_already_sent={das}".format(
+                dlr=diagnostics.get("discarded_low_relevance", 0),
+                dd=diagnostics.get("discarded_diversity", 0),
+                das=diagnostics.get("discarded_already_sent", 0),
+            )
+        )
 
     if not jobs:
         print("No new matching jobs found today.")
