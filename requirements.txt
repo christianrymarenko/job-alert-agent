@@ -1,0 +1,9 @@
+APScheduler
+beautifulsoup4
+Jinja2
+lxml
+pydantic
+python-dotenv
+PyYAML
+requests
+pytest

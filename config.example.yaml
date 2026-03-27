@@ -1,0 +1,97 @@
+app:
+  timezone: "Europe/Berlin"
+  send_time: "10:00"
+  min_relevance_score: 55
+  send_no_results_email: false
+  max_jobs_per_email: 30
+
+search:
+  country_focus: "Germany"
+  preferred_locations:
+    - "Muenchen"
+    - "Munich"
+    - "Bayern"
+    - "Bavaria"
+  allow_remote: true
+  allow_hybrid: true
+
+  # Base terms for direct matching in title/snippet.
+  keywords:
+    - "KI Manager"
+    - "AI Manager"
+    - "KI Berater"
+    - "AI Consultant"
+    - "AI Lead"
+    - "AI Projektmanager"
+    - "KI Projektmanager"
+    - "AI Transformation Manager"
+    - "AI Solutions Manager"
+    - "AI Program Manager"
+    - "AI Innovation Manager"
+    - "AI Delivery Manager"
+    - "AI Strategy Consultant"
+    - "AI Adoption Manager"
+    - "AI Enablement Manager"
+    - "AI Product Lead"
+    - "Projektleitung AI"
+    - "Manager AI Consulting"
+    - "Consultant Generative AI"
+    - "Consultant KI"
+    - "Lead KI"
+
+  discovery_queries:
+    - "site:de AI Manager job"
+    - "site:de KI Consultant Karriere"
+    - "site:softgarden.io Projektleitung KI"
+    - "site:jobs.adesso-group.com AI"
+    - "site:jobs.smartrecruiters.com AI Germany"
+
+sources:
+  enabled:
+    - "adzuna"
+    - "greenhouse"
+    - "company_pages"
+    - "search_discovery"
+
+  adzuna:
+    enabled: true
+    results_per_page: 30
+    max_pages: 2
+
+  greenhouse:
+    enabled: true
+    boards:
+      - "deepmind"
+      - "celonis"
+      - "personio"
+
+  company_pages:
+    enabled: true
+    max_depth: 1
+    max_pages_per_company: 3
+    throttle_seconds: 1.0
+    respect_robots_txt: true
+    pages:
+      - name: "adesso"
+        url: "https://jobs.adesso-group.com/"
+      - name: "serviceplan_softgarden"
+        url: "https://serviceplan.softgarden.io/"
+
+  search_discovery:
+    enabled: true
+    provider: "duckduckgo_html" # currently implemented provider
+    max_results_per_query: 20
+    throttle_seconds: 1.0
+    allowed_domains:
+      - "softgarden.io"
+      - "jobs.adesso-group.com"
+      - "smartrecruiters.com"
+      - "greenhouse.io"
+      - "lever.co"
+      - "personio.de"
+      - "personio.com"
+      - "workdayjobs.com"
+      - "join.com"
+      - "stellenanzeigen.de"
+      - "indeed.com"
+      - "linkedin.com"
