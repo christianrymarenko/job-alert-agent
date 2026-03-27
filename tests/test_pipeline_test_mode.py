@@ -1,5 +1,3 @@
-from datetime import datetime
-
 from src.core.models import JobPosting
 from src.core.pipeline import execute_job_search_run
 
@@ -58,7 +56,7 @@ def test_local_test_mode_sends_email_and_does_not_mark_sent(monkeypatch, tmp_pat
     assert len(sent_calls) == 1
     assert sent_calls[0]["recipient_override"] == "test-inbox@example.com"
 
-    # Second run should still treat item as unsent for normal recipient because test mode does not mark sent.
+    # Second run should still treat item as unsent because test mode does not mark sent.
     summary_second = execute_job_search_run(
         config=config,
         dry_run=False,
@@ -66,4 +64,35 @@ def test_local_test_mode_sends_email_and_does_not_mark_sent(monkeypatch, tmp_pat
         test_recipient="test-inbox@example.com",
     )
     assert summary_second["emails_sent"] == 1
+
+
+def test_dry_run_writes_artifacts_and_skips_email(monkeypatch, tmp_path) -> None:
+    db_path = tmp_path / "jobs.db"
+    from src.core.config import load_config
+
+    config = load_config(config_path="/workspace/config.example.yaml")
+    config.db_path = str(db_path)
+    config.sources.enabled = []
+
+    job = JobPosting(
+        source="dummy",
+        title="AI Consultant",
+        company="Example",
+        location="Munich",
+        url="https://example.com/jobs/2",
+        description_snippet="AI consulting and transformation",
+    )
+    monkeypatch.setattr("src.core.pipeline.build_sources", lambda _cfg: [_DummySource([job])])
+
+    called = {"email": 0}
+
+    def _fake_send_email(*_args, **_kwargs) -> None:
+        called["email"] += 1
+
+    monkeypatch.setattr("src.core.pipeline.send_email", _fake_send_email)
+
+    summary = execute_job_search_run(config=config, dry_run=True)
+    assert summary["emails_sent"] == 0
+    assert called["email"] == 0
+    assert (tmp_path / "daily_jobs.txt").exists() is False  # written in cwd, not tmp
 

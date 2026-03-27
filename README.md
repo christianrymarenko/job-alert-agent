@@ -150,9 +150,9 @@ python run_once.py --config config.yaml --env-file .env
 
 Optional flags:
 
-- `--dry-run` (no email sent)
-- `--local-test-email` (force immediate email using current run results)
-- `--test-recipient you@example.com` (override recipient for local test email)
+- `--dry-run` (skip SMTP completely; still writes output artifacts and prints console summary)
+- `--test-email` (force immediate email attempt using current run results)
+- `--test-recipient you@example.com` (override recipient for test email)
 
 ### Daily scheduler process
 
@@ -162,20 +162,38 @@ python main.py
 
 This runs continuously and executes daily at configured time in Europe/Berlin.
 
-### Local test mode (immediate email)
+### Dry-run workflow (no SMTP required)
 
-Use this to validate email formatting and dedup behavior without waiting for the scheduler:
+Use this when SMTP is disabled/broken or when you only want to validate results locally:
 
 ```bash
-python run_once.py --config config.yaml --env-file .env --local-test-email --test-recipient you@example.com
+python run_once.py --config config.yaml --env-file .env --dry-run
 ```
 
 Behavior:
 
-- executes the normal source + scoring + dedupe pipeline
-- sends an email immediately to the configured/overridden recipient
-- subject is prefixed with `[LOCAL TEST]`
-- marks sent jobs like a normal run, so deduplication can be validated on repeated test runs
+- executes normal source + scoring + dedupe logic
+- **never sends email** in dry-run mode
+- writes local artifacts:
+  - `daily_jobs.txt`
+  - `data/latest_jobs.json`
+- prints a readable summary and job list to console
+- run succeeds even if SMTP is not configured
+
+### Test email mode (immediate send attempt)
+
+If you want to test SMTP delivery immediately:
+
+```bash
+python run_once.py --config config.yaml --env-file .env --test-email --test-recipient you@example.com
+```
+
+Behavior:
+
+- executes normal source + scoring + dedupe pipeline
+- attempts immediate SMTP send (subject is prefixed with `[TEST]`)
+- if SMTP fails, run still succeeds and fallback artifacts are still written
+- does **not** mark jobs as sent in test mode, so repeated formatting tests remain possible
 
 ## Cron-Friendly Alternative
 

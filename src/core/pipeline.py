@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import argparse
+import json
 import logging
-from datetime import datetime
+from datetime import UTC, datetime
+from pathlib import Path
 from uuid import uuid4
 
 from apscheduler.schedulers.blocking import BlockingScheduler
@@ -86,6 +88,7 @@ def execute_job_search_run(
 
     emails_sent = 0
     email_test_mode_used = 0
+    email_failed = 0
     run_date = datetime.now(ZoneInfo(config.app.timezone))
     if test_mode:
         if dry_run:
@@ -94,17 +97,44 @@ def execute_job_search_run(
             recipient = (test_recipient or "").strip() or str(config.smtp.email_to)
             subject = build_subject(run_date, len(unique_new), prefix="TEST")
             body = render_plaintext_email(unique_new, run_date)
-            send_email(config, subject, body, email_to_override=recipient)
-            emails_sent = 1
-            email_test_mode_used = 1
-            logger.info("Test email sent to %s with %s candidate jobs", recipient, len(unique_new))
+            try:
+                send_email(config, subject, body, email_to_override=recipient)
+                emails_sent = 1
+                email_test_mode_used = 1
+                logger.info("Test email sent to %s with %s candidate jobs", recipient, len(unique_new))
+            except Exception as exc:  # noqa: BLE001
+                email_failed = 1
+                logger.exception("Test email failed, continuing without crash: %s", exc)
     elif should_send_email(config, len(unique_new)):
         if not dry_run:
             subject = build_subject(run_date, len(unique_new))
             body = render_plaintext_email(unique_new, run_date)
-            send_email(config, subject, body)
-            storage.mark_jobs_sent(unique_new, sent_batch_id=uuid4().hex)
-        emails_sent = 1
+            try:
+                send_email(config, subject, body)
+                storage.mark_jobs_sent(unique_new, sent_batch_id=uuid4().hex)
+                emails_sent = 1
+            except Exception as exc:  # noqa: BLE001
+                email_failed = 1
+                logger.exception("Email send failed, continuing without crash: %s", exc)
+        else:
+            logger.info("Dry-run enabled: skipping SMTP email send.")
+
+    _write_result_artifacts(
+        unique_new,
+        run_date=run_date,
+        email_attempted=bool(test_mode or (should_send_email(config, len(unique_new)) and not dry_run)),
+        email_sent=bool(emails_sent),
+        email_failed=bool(email_failed),
+        dry_run=dry_run,
+    )
+    _print_results_to_console(
+        unique_new,
+        run_date=run_date,
+        email_attempted=bool(test_mode or (should_send_email(config, len(unique_new)) and not dry_run)),
+        email_sent=bool(emails_sent),
+        email_failed=bool(email_failed),
+        dry_run=dry_run,
+    )
 
     summary = {
         "discovered": len(discovered_jobs),
@@ -112,10 +142,113 @@ def execute_job_search_run(
         "new": len(unique_new),
         "emails_sent": emails_sent,
         "test_email_mode": email_test_mode_used,
+        "email_failed": email_failed,
         "source_failures": source_failures,
     }
     logger.info("Run summary: %s", summary)
     return summary
+
+
+def _write_result_artifacts(
+    jobs: list[JobPosting],
+    run_date: datetime,
+    email_attempted: bool,
+    email_sent: bool,
+    email_failed: bool,
+    dry_run: bool,
+) -> None:
+    txt_path = Path("daily_jobs.txt")
+    json_path = Path("data/latest_jobs.json")
+    json_path.parent.mkdir(parents=True, exist_ok=True)
+
+    lines: list[str] = []
+    lines.append(f"AI/KI Job Agent Results - {run_date.date().isoformat()}")
+    lines.append(f"Total new jobs: {len(jobs)}")
+    if dry_run:
+        lines.append("Email status: skipped (--dry-run)")
+    elif email_sent:
+        lines.append("Email status: sent")
+    elif email_failed:
+        lines.append("Email status: failed (run continued)")
+    elif email_attempted:
+        lines.append("Email status: attempted (not sent)")
+    else:
+        lines.append("Email status: not attempted (config/no-results policy)")
+    lines.append("")
+    if not jobs:
+        lines.append("No matching new jobs found.")
+    else:
+        for idx, job in enumerate(jobs, start=1):
+            lines.append(f"{idx}. {job.title} - {job.company} - {job.location}")
+            lines.append(f"   Source: {job.source}")
+            lines.append(
+                "   Why it matches: "
+                + (job.match_reason or "Relevante AI/KI Rolle mit Business-/Projektfokus")
+            )
+            lines.append(f"   Link: {job.url}")
+            lines.append("")
+    txt_path.write_text("\n".join(lines).rstrip() + "\n", encoding="utf-8")
+
+    payload = {
+        "generated_at": datetime.now(UTC).isoformat(),
+        "run_date": run_date.date().isoformat(),
+        "count": len(jobs),
+        "email": {
+            "attempted": email_attempted,
+            "sent": email_sent,
+            "failed": email_failed,
+            "dry_run": dry_run,
+        },
+        "jobs": [
+            {
+                "title": job.title,
+                "company": job.company,
+                "location": job.location,
+                "source": job.source,
+                "url": job.url,
+                "score": job.score,
+                "match_reason": job.match_reason,
+            }
+            for job in jobs
+        ],
+    }
+    json_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+
+
+def _print_results_to_console(
+    jobs: list[JobPosting],
+    run_date: datetime,
+    email_attempted: bool,
+    email_sent: bool,
+    email_failed: bool,
+    dry_run: bool,
+) -> None:
+    print("")
+    print(f"=== AI/KI Job Agent Results ({run_date.date().isoformat()}) ===")
+    print(f"New jobs: {len(jobs)}")
+    if dry_run:
+        print("Email: skipped (--dry-run)")
+    elif email_sent:
+        print("Email: sent")
+    elif email_failed:
+        print("Email: failed (run continued, artifacts written)")
+    elif email_attempted:
+        print("Email: attempted (not sent)")
+    else:
+        print("Email: not attempted (config/no-results policy)")
+    if not jobs:
+        print("No matching new jobs found.")
+        print("")
+        return
+    for idx, job in enumerate(jobs, start=1):
+        print(f"{idx}. {job.title} - {job.company} - {job.location}")
+        print(f"   Source: {job.source}")
+        print(
+            "   Why: "
+            + (job.match_reason or "Relevante AI/KI Rolle mit Business-/Projektfokus")
+        )
+        print(f"   Link: {job.url}")
+    print("")
 
 
 def _parse_send_time(send_time: str) -> tuple[int, int]:
