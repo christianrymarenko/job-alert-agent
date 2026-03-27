@@ -149,13 +149,28 @@ HTML_TEMPLATE = Template(
         line-height: 1.35;
       }
       .score-pill {
-        background: var(--accent-soft);
-        color: var(--accent);
-        border-radius: 999px;
-        font-size: 0.78rem;
-        font-weight: 700;
-        padding: 5px 11px;
+        background: linear-gradient(180deg, #1f4fbf 0%, #173c95 100%);
+        color: #ffffff;
+        border-radius: 12px;
+        font-size: 0.8rem;
+        font-weight: 800;
+        padding: 6px 10px;
         white-space: nowrap;
+        min-width: 78px;
+        text-align: center;
+        box-shadow: 0 4px 10px rgba(23, 60, 149, 0.28);
+      }
+      .score-pill .score-value {
+        display: block;
+        font-size: 1.02rem;
+        line-height: 1.1;
+      }
+      .score-pill .score-label {
+        display: block;
+        opacity: 0.9;
+        font-size: 0.66rem;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
       }
       .meta {
         margin-top: 5px;
@@ -253,7 +268,10 @@ HTML_TEMPLATE = Template(
               <article class="card">
                 <div class="card-top">
                   <h3 class="job-title">{{ job.title }}</h3>
-                  <div class="score-pill">Score {{ job.score }}</div>
+                  <div class="score-pill">
+                    <span class="score-value">{{ job.score }}</span>
+                    <span class="score-label">Score</span>
+                  </div>
                 </div>
                 <div class="meta">{{ job.company }} · {{ job.location }} · {{ job.source }}</div>
                 <div class="why"><strong>Why it matches:</strong> {{ job.match_reason }}</div>
@@ -279,7 +297,10 @@ HTML_TEMPLATE = Template(
               <article class="card">
                 <div class="card-top">
                   <h3 class="job-title">{{ job.title }}</h3>
-                  <div class="score-pill">Score {{ job.score }}</div>
+                  <div class="score-pill">
+                    <span class="score-value">{{ job.score }}</span>
+                    <span class="score-label">Score</span>
+                  </div>
                 </div>
                 <div class="meta">{{ job.company }} · {{ job.location }} · {{ job.source }}</div>
                 <div class="why"><strong>Why it matches:</strong> {{ job.match_reason }}</div>

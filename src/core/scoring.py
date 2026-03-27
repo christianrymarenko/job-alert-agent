@@ -4,62 +4,74 @@ import re
 
 from src.core.models import JobPosting, SearchSettings
 
-# Strong signals in title for business-facing AI profile fit.
-TITLE_BONUS_TERMS = {
-    "ai": 14,
-    "ki": 14,
+STRONG_AI_SIGNAL_PATTERNS: list[tuple[str, str]] = [
+    ("AI", r"\bai\b"),
+    ("KI", r"\bki\b"),
+    ("Artificial Intelligence", r"\bartificial intelligence\b"),
+    ("Künstliche Intelligenz", r"\bkünstliche intelligenz\b"),
+    ("Kuenstliche Intelligenz", r"\bkuenstliche intelligenz\b"),
+    ("GenAI", r"\bgenai\b"),
+    ("Generative AI", r"\bgenerative ai\b"),
+    ("LLM", r"\bllm\b"),
+    ("Large Language Model", r"\blarge language model\b"),
+    ("AI transformation", r"\bai transformation\b"),
+    ("AI implementation", r"\bai implementation\b"),
+    ("KI Implementierung", r"\bki implementierung\b"),
+    ("AI consulting", r"\bai consulting\b"),
+    ("KI Beratung", r"\bki beratung\b"),
+    ("AI strategy", r"\bai strategy\b"),
+    ("KI Strategie", r"\bki strategie\b"),
+    ("AI project", r"\bai project\b"),
+    ("KI Projekt", r"\bki projekt\b"),
+]
+
+# Must indicate business-side AI ownership, not generic manager language.
+BUSINESS_AI_ROLE_TERMS = {
+    "ai consultant": 18,
+    "ki consultant": 18,
+    "ai berater": 18,
+    "ki berater": 18,
+    "ai manager": 16,
+    "ki manager": 16,
+    "ai transformation": 16,
+    "ki transformation": 16,
+    "ai implementation": 15,
+    "ki implementierung": 15,
+    "ai strategy": 14,
+    "ki strategie": 14,
+    "ai project": 14,
+    "ki projekt": 14,
+    "ai adoption": 13,
+    "ai enablement": 13,
+    "generative ai": 14,
     "genai": 14,
-    "consultant": 12,
-    "berater": 12,
-    "manager": 10,
-    "lead": 10,
-    "projektleitung": 12,
-    "projektmanager": 10,
-    "program manager": 10,
-    "programm manager": 10,
-    "transformation": 11,
-    "adoption": 9,
-    "enablement": 9,
-    "strategy": 9,
-    "strategie": 9,
-    "implementation": 10,
-    "implementierung": 10,
-    "delivery": 8,
-    "product": 8,
-    "produkt": 8,
-    "owner": 6,
+    "llm": 13,
+    "project lead ai": 14,
+    "projektleitung ki": 14,
+    "programmmanagement ai": 13,
+    "ai pmo": 13,
 }
 
-# Semantics from description/snippet emphasizing consulting + business leadership.
-BODY_BONUS_TERMS = {
-    "ai strategy": 9,
-    "ki strategie": 9,
-    "digital transformation": 10,
-    "transformation": 8,
-    "adoption": 8,
-    "enablement": 8,
-    "rollout": 8,
-    "implementation": 8,
-    "implementierung": 8,
-    "use case": 7,
-    "stakeholder management": 9,
-    "stakeholder": 7,
-    "consulting": 9,
-    "beratung": 9,
-    "project leadership": 8,
+SUPPORTING_BUSINESS_TERMS = {
+    "stakeholder management": 8,
+    "stakeholder": 6,
+    "consulting": 8,
+    "beratung": 8,
     "projektleitung": 8,
-    "program management": 8,
-    "programmmanagement": 8,
-    "pmo": 6,
+    "project leadership": 8,
+    "program management": 7,
+    "programmmanagement": 7,
+    "pmo": 7,
     "governance": 6,
-    "change management": 8,
-    "business development": 7,
-    "saas": 8,
-    "platform": 7,
-    "plattform": 7,
-    "product leadership": 7,
-    "kunden": 6,
-    "customer": 6,
+    "rollout": 7,
+    "adoption": 7,
+    "enablement": 7,
+    "implementation": 7,
+    "implementierung": 7,
+    "use case": 6,
+    "saas": 6,
+    "platform": 5,
+    "plattform": 5,
 }
 
 # Language and geography preferences for this candidate.
@@ -94,7 +106,21 @@ GERMANY_TERMS = {
     "dusseldorf",
 }
 
-# Strong downranking for hands-on technical engineering roles.
+# Hard reject list for clearly non-target generic roles.
+HARD_EXCLUDE_PATTERNS: list[tuple[str, str]] = [
+    ("paid social", r"\bpaid social\b"),
+    ("PR", r"\bpr\b"),
+    ("public relations", r"\bpublic relations\b"),
+    ("influencer", r"\binfluencer\b"),
+    ("programmatic advertising", r"\bprogrammatic advertising\b"),
+    ("account manager", r"\baccount manager\b"),
+    ("sales manager", r"\bsales manager\b"),
+    ("media consultant", r"\bmedia consultant\b"),
+    ("artist", r"\bartist\b"),
+    ("social media", r"\bsocial media\b"),
+]
+
+# Strong downranking for technical engineering roles.
 NEGATIVE_TERMS = {
     "machine learning engineer": -35,
     "ml engineer": -34,
@@ -133,8 +159,16 @@ def _count_weighted_terms(text: str, weighted_terms: dict[str, int]) -> tuple[in
     return score, reasons
 
 
+def _find_pattern_hits(text: str, patterns: list[tuple[str, str]]) -> list[str]:
+    hits: list[str] = []
+    for label, pattern in patterns:
+        if re.search(pattern, text):
+            hits.append(label)
+    return hits
+
+
 def score_job(job: JobPosting, search: SearchSettings) -> tuple[int, str]:
-    """Score role relevance for senior business-facing AI transformation profile."""
+    """Score role relevance for strict senior business-side AI profile."""
     title = _normalize(job.title)
     snippet = _normalize(job.description_snippet)
     company = _normalize(job.company)
@@ -144,15 +178,26 @@ def score_job(job: JobPosting, search: SearchSettings) -> tuple[int, str]:
     score = 0
     reasons: list[str] = []
 
-    title_score, title_hits = _count_weighted_terms(title, TITLE_BONUS_TERMS)
-    score += title_score
-    if title_hits:
-        reasons.append(f"Title: {', '.join(sorted(set(title_hits)))}")
+    # Hard exclusion first: generic non-AI target domains should never pass.
+    hard_exclude_hits = _find_pattern_hits(blob, HARD_EXCLUDE_PATTERNS)
+    if hard_exclude_hits:
+        return 0, "Hard exclude: " + ", ".join(hard_exclude_hits)
 
-    body_score, body_hits = _count_weighted_terms(blob, BODY_BONUS_TERMS)
-    score += body_score
-    if body_hits:
-        reasons.append(f"Business AI fit: {', '.join(sorted(set(body_hits)))}")
+    # Require at least one explicit strong AI/KI signal.
+    strong_ai_hits = _find_pattern_hits(blob, STRONG_AI_SIGNAL_PATTERNS)
+    if not strong_ai_hits:
+        return 0, "Rejected: missing explicit AI/KI signal"
+    reasons.append(f"AI signal: {', '.join(sorted(set(strong_ai_hits))[:4])}")
+
+    role_score, role_hits = _count_weighted_terms(blob, BUSINESS_AI_ROLE_TERMS)
+    score += role_score
+    if role_hits:
+        reasons.append(f"AI role fit: {', '.join(sorted(set(role_hits)))}")
+
+    support_score, support_hits = _count_weighted_terms(blob, SUPPORTING_BUSINESS_TERMS)
+    score += support_score
+    if support_hits:
+        reasons.append(f"Business fit: {', '.join(sorted(set(support_hits)))}")
 
     # Slightly reward semantic proximity to configured search intent.
     keyword_hits = 0
@@ -205,8 +250,28 @@ def score_job(job: JobPosting, search: SearchSettings) -> tuple[int, str]:
     if neg_hits:
         reasons.append(f"Penalties: {', '.join(sorted(set(neg_hits)))}")
 
-    # Base score still allows sparse but likely-relevant postings to pass.
-    score += 18
+    # Must show at least one business-side leadership/consulting cue.
+    if not any(
+        cue in blob
+        for cue in (
+            "consultant",
+            "berater",
+            "manager",
+            "lead",
+            "projekt",
+            "project",
+            "program",
+            "programm",
+            "transformation",
+            "implementation",
+            "adoption",
+            "enablement",
+            "strategy",
+            "strategie",
+            "pmo",
+        )
+    ):
+        return 0, "Rejected: lacks business-side AI ownership cues"
 
     # Hard brake: technical engineering-heavy titles should stay low even with AI mentions.
     if any(term in title for term in ("engineer", "developer", "scientist", "mlops")) and not any(
@@ -214,6 +279,11 @@ def score_job(job: JobPosting, search: SearchSettings) -> tuple[int, str]:
     ):
         score -= 20
         reasons.append("Engineering-heavy title downrank")
+
+    # Generic titles with only weak coupling to AI business role should not pass too easily.
+    if not role_hits and len(strong_ai_hits) <= 1:
+        score -= 10
+        reasons.append("Weak AI-role coupling penalty")
 
     score = max(0, min(100, score))
     reason = "; ".join(reasons) if reasons else "General AI/KI business relevance"

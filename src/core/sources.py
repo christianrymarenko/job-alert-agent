@@ -5,11 +5,26 @@ from src.sources.adzuna import AdzunaSource
 from src.sources.base import SourceAdapter
 from src.sources.company_pages import CompanyPagesSource
 from src.sources.greenhouse import GreenhouseSource
+from src.sources.google_jobs_discovery import GoogleJobsDiscoverySource
 from src.sources.search_discovery import SearchDiscoverySource
 
 
 def build_sources(config: Settings) -> list[SourceAdapter]:
-    enabled = {name.strip().lower() for name in config.sources.enabled}
+    explicit_enabled = [name.strip().lower() for name in config.sources.enabled if name.strip()]
+    enabled = set(explicit_enabled)
+    discovery_sources = {
+        "linkedin",
+        "linkedin_jobs",
+        "indeed",
+        "indeed_de",
+        "stepstone",
+        "xing",
+        "jobscout24",
+        "google_jobs",
+        "search_discovery",
+    }
+    if enabled & discovery_sources:
+        enabled.add("search_discovery")
     adapters: list[SourceAdapter] = []
 
     if "adzuna" in enabled and config.sources.adzuna.get("enabled", True):
@@ -20,6 +35,8 @@ def build_sources(config: Settings) -> list[SourceAdapter]:
         adapters.append(CompanyPagesSource(config))
     if "search_discovery" in enabled and config.sources.search_discovery.get("enabled", True):
         adapters.append(SearchDiscoverySource(config))
+    if "google_jobs_discovery" in enabled and config.sources.google_jobs_discovery.get("enabled", True):
+        adapters.append(GoogleJobsDiscoverySource(config))
 
     return adapters
 
