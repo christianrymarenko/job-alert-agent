@@ -75,11 +75,22 @@ This MVP is built to be modular and robust, with clear extension points for addi
    - **robots.txt aware** and domain allowlist controls
    - optional crawl depth (default conservative) and per-domain request caps
    - filters likely job/career links and keeps source metadata
-4. **Search discovery source (search-engine based)**
-   - DuckDuckGo HTML endpoint with configured discovery queries
-   - extracts likely German AI/KI job links from search result pages
-   - supports host/path allowlists to keep discovery focused and compliant
-   - does not execute JavaScript and keeps request rate conservative
+4. **Search discovery source (market-wide, search-engine based)**
+   - broad query generation across major market platforms:
+     - LinkedIn Jobs
+     - Indeed Germany
+     - StepStone
+     - XING Jobs
+     - JobScout24
+     - Google Jobs style discovery
+   - combines role/context/location query variants and lightly randomizes combinations per run
+   - extracts candidate job URLs from search results and applies strict job-detail URL filtering
+   - fetches job detail pages for enrichment (title/company/location/description snippet) where possible
+   - deduplicates URLs across query/platform buckets
+   - supports host allowlists and robots-aware behavior
+5. **Google-jobs-focused discovery adapter**
+   - separate search-discovery profile focused on Google Jobs-like query patterns
+   - disabled/enabled via config as an independent source module
 
 ### Why not scrape everything directly?
 
@@ -101,6 +112,18 @@ The company-page and discovery adapters include conservative controls:
 - small crawl depth / limited URLs per run
 - optional host/path allowlists to restrict discovery
 - graceful handling of blocked pages and partial failures
+
+### Diversity controls
+
+To reduce company bias and over-representation:
+
+- configurable `max_jobs_per_company` cap applied at pipeline stage
+- configurable `min_unique_companies` target with soft fallback behavior
+- run summary logs include:
+  - jobs by source
+  - unique company count
+  - dropped-by-diversity count
+  - dropped-by-score count
 
 ## Setup
 
@@ -137,7 +160,7 @@ Adjust:
 - `app.timezone` (default `Europe/Berlin`)
 - `app.min_relevance_score`
 - `sources.enabled`
-- source-specific settings (`adzuna`, `greenhouse`, `company_pages`, `search_discovery`)
+- source-specific settings (`adzuna`, `greenhouse`, `company_pages`, `search_discovery`, `google_jobs_discovery`)
 - keyword/search preferences
 
 ## Running
@@ -184,6 +207,23 @@ Behavior:
   - optional archives under `reports/archive/`
 - prints a readable summary and job list to console
 - run succeeds even if SMTP is not configured
+
+### Broad market discovery tuning
+
+For wider German-market coverage, configure:
+
+- `search.role_keywords`
+- `search.context_keywords`
+- `search.location_keywords`
+- `search.search_query_variants`
+- `search.discovery_queries` (optional explicit additions)
+- `search.max_jobs_per_company`
+- `search.min_unique_companies`
+
+You can also toggle platform-style discovery sources independently via:
+
+- `sources.search_discovery.enabled`
+- `sources.google_jobs_discovery.enabled`
 
 ### HTML report mode (browser review)
 

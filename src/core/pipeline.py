@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+from collections import Counter
 import logging
 from datetime import datetime
 from uuid import uuid4
@@ -24,6 +25,24 @@ from src.core.sources import build_sources
 from src.core.storage import Storage
 
 logger = logging.getLogger(__name__)
+
+
+def _apply_company_diversity_limit(jobs: list[JobPosting], max_jobs_per_company: int) -> list[JobPosting]:
+    if max_jobs_per_company <= 0:
+        return jobs
+    company_counts: Counter[str] = Counter()
+    limited: list[JobPosting] = []
+    for job in jobs:
+        key = job.company.strip().lower()
+        if company_counts[key] >= max_jobs_per_company:
+            continue
+        company_counts[key] += 1
+        limited.append(job)
+    return limited
+
+
+def _count_unique_companies(jobs: list[JobPosting]) -> int:
+    return len({j.company.strip().lower() for j in jobs if j.company.strip()})
 
 
 def execute_job_search_run(
@@ -63,6 +82,13 @@ def execute_job_search_run(
                 accepted=accepted_for_source,
                 error_message=error_message,
             )
+            logger.info(
+                "source=%s discovered=%s accepted=%s error=%s",
+                source.name,
+                len(jobs),
+                accepted_for_source,
+                bool(error_message),
+            )
 
     accepted_scored: list[JobPosting] = []
     for job in discovered_jobs:
@@ -71,6 +97,7 @@ def execute_job_search_run(
         job.match_reason = reason
         if score >= config.app.min_relevance_score:
             accepted_scored.append(job)
+    discarded_low_relevance = len(discovered_jobs) - len(accepted_scored)
 
     unique_new: list[JobPosting] = []
     seen_keys: set[tuple[str, str, str]] = set()
@@ -89,7 +116,9 @@ def execute_job_search_run(
         unique_new.append(job)
 
     unique_new.sort(key=lambda j: j.score, reverse=True)
+    unique_new = _apply_company_diversity_limit(unique_new, config.search.max_jobs_per_company)
     unique_new = unique_new[: config.app.max_jobs_per_email]
+    unique_companies = _count_unique_companies(unique_new)
 
     emails_sent = 0
     email_test_mode_used = 0
@@ -195,8 +224,16 @@ def execute_job_search_run(
         "email_failed": email_failed,
         "html_report": int(html_report),
         "source_failures": source_failures,
+        "unique_companies": unique_companies,
+        "discarded_low_relevance": discarded_low_relevance,
     }
     logger.info("Run summary: %s", summary)
+    if unique_companies < config.search.min_unique_companies:
+        logger.warning(
+            "Low source diversity: unique_companies=%s < min_unique_companies=%s",
+            unique_companies,
+            config.search.min_unique_companies,
+        )
     return summary
 
 

@@ -49,9 +49,32 @@ def load_config(config_path: str | None = None, env_file: str | None = None) -> 
     return Settings(
         app=yaml_data.get("app", {}),
         search=yaml_data.get("search", {}),
-        sources=yaml_data.get("sources", {}),
+        sources=_normalize_sources_config(yaml_data.get("sources", {}), yaml_data.get("search", {})),
         smtp=smtp,
         db_path=os.getenv("JOB_AGENT_DB_PATH", "./data/job_agent.db"),
         log_level=os.getenv("JOB_AGENT_LOG_LEVEL", "INFO"),
         notify_errors=_env_bool("JOB_AGENT_NOTIFY_ERRORS", default=False),
     )
+
+
+def _normalize_sources_config(
+    sources_data: dict[str, Any] | Any,
+    search_data: dict[str, Any] | Any,
+) -> dict[str, Any]:
+    if not isinstance(sources_data, dict):
+        sources_data = {}
+    if not isinstance(search_data, dict):
+        search_data = {}
+
+    sd = dict(sources_data)
+    search_discovery = sd.get("search_discovery")
+    if not isinstance(search_discovery, dict):
+        search_discovery = {}
+        sd["search_discovery"] = search_discovery
+
+    # Backward compatibility: if search_discovery.queries missing, use search.discovery_queries.
+    if "queries" not in search_discovery:
+        discovery_queries = search_data.get("discovery_queries")
+        if isinstance(discovery_queries, list):
+            search_discovery["queries"] = discovery_queries
+    return sd

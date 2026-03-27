@@ -25,6 +25,8 @@ class SearchSettings(BaseModel):
     allow_hybrid: bool = True
     keywords: list[str] = Field(default_factory=list)
     discovery_queries: list[str] = Field(default_factory=list)
+    max_jobs_per_company: int = 3
+    min_unique_companies: int = 5
 
 
 class SourceSettings(BaseModel):
@@ -33,6 +35,13 @@ class SourceSettings(BaseModel):
     greenhouse: dict[str, Any] = Field(default_factory=dict)
     company_pages: dict[str, Any] = Field(default_factory=dict)
     search_discovery: dict[str, Any] = Field(default_factory=dict)
+    linkedin: dict[str, Any] = Field(default_factory=dict)
+    indeed: dict[str, Any] = Field(default_factory=dict)
+    stepstone: dict[str, Any] = Field(default_factory=dict)
+    xing: dict[str, Any] = Field(default_factory=dict)
+    jobscout24: dict[str, Any] = Field(default_factory=dict)
+    google_jobs: dict[str, Any] = Field(default_factory=dict)
+    google_jobs_discovery: dict[str, Any] = Field(default_factory=dict)
 
 
 class SmtpSettings(BaseModel):
