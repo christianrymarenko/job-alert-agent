@@ -46,3 +46,39 @@ def test_low_score_for_engineering_role() -> None:
     score, reason = score_job(job, cfg)
     assert score < 50
     assert "penalties" in reason.lower()
+
+
+def test_german_business_facing_consulting_role_scores_high() -> None:
+    cfg = _cfg()
+    job = JobPosting(
+        source="test",
+        title="Senior Consultant KI-Transformation (m/w/d)",
+        company="ConsultingPartner GmbH",
+        location="Muenchen / Bayern / Hybrid",
+        url="https://example.com/jobs/consulting-ki",
+        description_snippet=(
+            "Beratung zur KI-Implementierung, Stakeholder-Management, "
+            "Programmsteuerung, AI Adoption und Enablement in SaaS-Umfeldern."
+        ),
+    )
+    score, reason = score_job(job, cfg)
+    assert score >= 80
+    assert "consulting" in reason.lower()
+    assert "location" in reason.lower()
+
+
+def test_ambiguous_product_title_with_business_ai_context_is_accepted() -> None:
+    cfg = _cfg()
+    job = JobPosting(
+        source="test",
+        title="Senior Program Lead Digital Platforms",
+        company="PlatformCo",
+        location="Germany / Remote",
+        url="https://example.com/jobs/program-lead",
+        description_snippet=(
+            "Drive AI rollout, AI strategy, customer-facing transformation roadmap, "
+            "cross-functional stakeholder management and SaaS product leadership."
+        ),
+    )
+    score, _ = score_job(job, cfg)
+    assert score >= 65
